@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>文件上传测试</title>
+</head>
+<body>
+    <h2>大文件上传测试</h2>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">上传</button>
+    <div id="progress"></div>
+
+    <script>
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const progressDiv = document.getElementById('progress');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+
+            // 定义切片大小为5MB
+            const chunkSize = 5 * 1024 * 1024;
+            const chunks = Math.ceil(file.size / chunkSize);
+            let currentChunk = 0;
+            
+            progressDiv.innerHTML = '开始上传，总分片数：' + chunks;
+
+            // 上传单个切片
+            async function uploadChunk(chunk, chunkIndex) {
+                const formData = new FormData();
+                formData.append('file', chunk, file.name + '.part' + chunkIndex);
+                // 添加必要的参数
+                formData.append('chunkIndex', chunkIndex);
+                formData.append('chunks', chunks);
+                formData.append('filename', file.name);
+                
+                try {
+                    const response = await fetch('http://localhost:3000/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    throw new Error(`分片 ${chunkIndex} 上传失败: ${error.message}`);
+                }
+            }
+
+            // 开始分片上传
+            async function startUpload() {
+                try {
+                    while (currentChunk < chunks) {
+                        const start = currentChunk * chunkSize;
+                        const end = Math.min(start + chunkSize, file.size);
+                        const chunk = file.slice(start, end);
+                        
+                        await uploadChunk(chunk, currentChunk);
+                        currentChunk++;
+                        
+                        // 更新进度
+                        const progress = Math.round((currentChunk / chunks) * 100);
+                        progressDiv.innerHTML = `上传进度: ${progress}%`;
+                    }
+                    
+                    progressDiv.innerHTML = '文件上传完成！';
+                } catch (error) {
+                    progressDiv.innerHTML = '上传失败：' + error.message;
+                }
+            }
+
+            // 开始上传流程
+            startUpload();
+        }
+    </script>
+</body>
+</html> 
